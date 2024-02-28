@@ -40,15 +40,11 @@ The result is slightly influenced by the random seed, but fixing the random seed
 
 
 ### Pretrain Weight
-#### UCF-QNRF
+#### RSOC-building
 
 
 Google Drive [Link](https://drive.google.com/file/d/1d9VN-_o5-IVw_-yUpWXrkQhvfS3CZpQO/view?usp=share_link)
 
 
-### License
 
-GNU GENERAL PUBLIC LICENSE 
-Version 3, 29 June 2007
-Copyright © 2007 Free Software Foundation, Inc. <http://fsf.org/>
 
