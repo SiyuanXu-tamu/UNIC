@@ -32,7 +32,7 @@ python train.py
 
 
 The result is slightly influenced by the random seed, but fixing the random seed (have to set cuda_benchmark to False) will make training time extrodinary long, so sometimes you can get a slightly worse result than the reported result, but most of time you can get a better result than the reported one. If you find this code is useful, please give us a star and cite our paper, have fun.
-Also, this code also gives 2 kinds of UNIC that you can try, they are in models/aspd_spatial_uq1.py and models/aspd_spatial_uq1.py.
+Also, this code also gives 2 kinds of UNIC that you can try, they are in models/aspd_spatial_uq1.py and models/aspd_spatial_uq2.py.
 
 
 
