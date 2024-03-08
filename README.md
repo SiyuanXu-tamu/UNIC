@@ -17,33 +17,23 @@ This code was tested with python 3.6
 2、 Pre-Process Data (resize image and split train/validation)
 
 ```
-python preprocess_dataset.py --origin_dir <directory of original data> --data_dir <directory of processed data>
+python preprocess_dataset.py
 ```
 3、 generate ground truth for our loss function
 
 ```
-python preprocess_gt.py
+python preprocess_gt.py, python make_dataset_RSOC.py
 ```
 3、 Train model (validate on single NVidia V100)
 
 ```
-python train.py --data_dir <directory of processed data> --save_dir <directory of log and model>
+python train.py
 ```
 
-4、 Test Model
-```
-python val_test.py
-```
 
 The result is slightly influenced by the random seed, but fixing the random seed (have to set cuda_benchmark to False) will make training time extrodinary long, so sometimes you can get a slightly worse result than the reported result, but most of time you can get a better result than the reported one. If you find this code is useful, please give us a star and cite our paper, have fun.
+Also, this code also gives 2 kinds of UNIC that you can try, they are in models/aspd_spatial_uq1.py and models/aspd_spatial_uq1.py.
 
-
-
-### Pretrain Weight
-#### RSOC-building
-
-
-Google Drive [Link](https://drive.google.com/file/d/1d9VN-_o5-IVw_-yUpWXrkQhvfS3CZpQO/view?usp=share_link)
 
 
 
