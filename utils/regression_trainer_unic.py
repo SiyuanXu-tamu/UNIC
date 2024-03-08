@@ -10,22 +10,13 @@ from torch.utils.data.dataloader import default_collate
 import logging
 import numpy as np
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from  models.vgg import vgg19
-#from  models.aspd import ASPDNet
-#from  models.aspd_sr import ASRNet
-#from  models.ASPD_sr_SES import ASRNet
-#from  models.new_SES import ASRNet
-#from  models.aspd_sr_duo_vae import ASRNet
-#from  models.aspd_sr_vae import ASRNet
-#from  models.aspd_duo_test import New_bay_Net
 
-#from models.aspd_spatial_test import New_bay_Net
 from models.aspd_spatial_uq1 import New_bay_Net
-#from datasets.crowd_sr import Crowd
-from datasets.crowd_duo_vae import Crowd
+
+from datasets.crowd_unic import Crowd
 from losses.bay_loss_new import Bay_Loss
 from losses.post_prob_duo import Post_Prob
-#from losses.post_prob import Post_Prob
+
 import wandb
 import random
 
@@ -34,10 +25,7 @@ from torch.optim import lr_scheduler
 import cv2
 from matplotlib import pyplot as plt
 
-#random_n = 123#####random seed, this is for reproductivity
 
-#np.random.seed(random_n)
-#torch.manual_seed(random_n)
 
 def seed_worker(worker_id):
     worker_seed = torch.initial_seed() % 2**32
@@ -59,26 +47,24 @@ def train_collate(batch):
     
     images = torch.stack(transposed_batch[0], 0) ####img
     
-    sr_images = torch.stack(transposed_batch[1], 0)### sr_img
     
-    points = transposed_batch[2]  # keypoints, the number of points is not fixed, keep it as a list of tensor
+    points = transposed_batch[1]  # keypoints, the number of points is not fixed, keep it as a list of tensor
     
-    prior_prob = transposed_batch[3] ### prior_prob
+    prior_prob = transposed_batch[2] ### prior_prob
     
-    st_sizes = torch.FloatTensor(transposed_batch[4]) ###st_size  shortest size = min(w,h)
+    st_sizes = torch.FloatTensor(transposed_batch[3]) ###st_size  shortest size = min(w,h)
     
  
-    grid_c = torch.stack(transposed_batch[5], 0)
-    
-    grid_sr = torch.stack(transposed_batch[6], 0)
-    
-    gridnum_sam_c = transposed_batch[7] ####gridnum_sam_c
-    
-    gd_count = transposed_batch[8]
+    grid_c = torch.stack(transposed_batch[4], 0)
     
     
+    gridnum_sam_c = transposed_batch[5] ####gridnum_sam_c
     
-    return images, sr_images, points, prior_prob, st_sizes, grid_c, grid_sr, gridnum_sam_c, gd_count
+    gd_count = transposed_batch[6]
+    
+    
+    
+    return images, points, prior_prob, st_sizes, grid_c, gridnum_sam_c, gd_count
 
 
 class RegTrainer(Trainer):
@@ -93,8 +79,7 @@ class RegTrainer(Trainer):
         using_method = 'bay_vae'
         args = self.args
         
-        #np.random.seed(args.seed)
-        #torch.manual_seed(args.seed)
+
         
         
         logging.info('using seed {}'.format(args.seed))
@@ -115,13 +100,7 @@ class RegTrainer(Trainer):
                                   args.crop_size,
                                   args.downsample_ratio,
                                   args.is_gray, x) for x in ['train', 'val']}
-        ###RSOC
-        #self.datasets = {x: Crowd((os.path.join(args.data_dir, 'train') if x == 'train' else os.path.join(args.data_dir, 'test')),
-        #                          args.crop_size,
-        #                          args.downsample_ratio,
-        #                          args.is_gray, x) for x in ['train', 'val']}
-        
-        ######initial dataloader
+
         
         g = torch.Generator()
         g.manual_seed(args.seed)
@@ -142,41 +121,22 @@ class RegTrainer(Trainer):
         
         #####initial model
         
-        #self.model =vgg19()
-        #self.model =ASPDNet()
+
         self.model =New_bay_Net(self.downsample_ratio, args.crop_size)
         #self.model =ASRNet()
         self.model.to(self.device)
         
         self.use_sr = args.use_sr
         
-        total_num, trainable_num = get_parameters_number(self.model.ASRNet.mid_end)
+        total_num, trainable_num = get_parameters_number(self.model)
         print(total_num, trainable_num)
+        
+
         
         
         #####initial optimizer, selct parameters' learning rate
         
-        #c_params = list(map(id, self.model.cc_decoder.parameters()))
-        #b_params = filter(lambda p: id(p) not in c_params, self.model.parameters())
-        
-        #training_params = [
-        #    {"params": b_params, "lr": args.lr, "weight_decay": args.weight_decay},
-        #    {"params": self.model.cc_decoder.parameters(), "lr": 1e-6, "weight_decay": args.weight_decay}
-        #    ]
-            
-        #sr_params = list(map(id, self.model.sr_decoder.parameters()))
-        #c_params = filter(lambda p: id(p) not in sr_params, self.model.parameters())
-        
-        #training_params = [
-        #    {"params": c_params, "lr": args.lr, "weight_decay": args.weight_decay},
-        #    {"params": self.model.sr_decoder.parameters(), "lr": 5*1e-4, "weight_decay": args.weight_decay}
-        #    ]    
-            
-        #training_params = [
-        #    {"params": train_params, "lr": args.lr, "weight_decay": args.weight_decay},
-        #    {"params": self.model.resnet_backbone.parameters(), "lr": 1e-4, "weight_decay": args.weight_decay}
-        #    ]
-        
+
         
         #self.optimizer = optim.Adam(training_params)
         c_params = list(map(id, self.model.cc_decoder.last2.parameters()))
@@ -243,14 +203,8 @@ class RegTrainer(Trainer):
             self.scheduler.step()
             
             if epoch % args.val_epoch == 0 and epoch >= args.val_start:
-                f1, f2 = self.val_epoch()
-                features1.append(f1)
-                features2.append(f2)
-                if epoch == 100:
-                    features1_ = np.array(features1)
-                    features2_ = np.array(features2)
-                    np.save('sr_test_features3', features1_)
-                    np.save('sr_test_features4', features2_)
+                self.val_epoch()
+
         #wandb finish
         self.run_db.finish()
 
@@ -265,28 +219,23 @@ class RegTrainer(Trainer):
         self.model.train()  
 
         # Iterate over data.
-        for step, (inputs, sr_gt, points, prior_prob, st_sizes, grid_c, grid_sr, gridnum_sam_c, gd_count) in enumerate(self.dataloaders['train']): 
+        for step, (inputs, points, prior_prob, st_sizes, grid_c, gridnum_sam_c, gd_count) in enumerate(self.dataloaders['train']): 
             #print(inputs.shape, sr_gt.shape)#3 256 256
             #print(targets.shape, st_sizes)
             
             ###set data to device
             
             inputs = inputs.to(self.device) ###img
-            sr_gt = sr_gt.to(self.device)   ###sr_img
             points = [p.to(self.device) for p in points] ###points
             prior_prob = [t.to(self.device) for t in prior_prob] ###prior_prob
             st_sizes = st_sizes.to(self.device)
             
             grid_c = grid_c.to(self.device)
             
-            grid_sr = grid_sr.to(self.device)
             
             gridnum_sam_c = [tt.to(self.device) for tt in gridnum_sam_c]
             
-            #gd_count = np.array([len(p) for p in points], dtype=np.float32)
-            #gd_count = gd_count.to(self.device)
-            
-            #print(grid_c)
+
             
             
             ###iteration
@@ -294,64 +243,20 @@ class RegTrainer(Trainer):
             
                 ###run the model
                 use_sr = False
-                if self.use_sr:
-                    outputs, sr_imgs, f1, f2 = self.model(inputs, grid_c, grid_sr, self.use_sr)   
-                    
-                    loss2 = torch.nn.MSELoss(reduction = 'sum')(sr_imgs,torch.transpose(sr_gt,1,2))/outputs.shape[0]
-                else:
-                    outputs, f1, f2, out_sigma = self.model(inputs, grid_c, grid_sr, self.use_sr, 'train', epoch)   
-                    #outputs, f1, f2 = self.model(inputs, grid_sr, self.use_sr)
-                    #outputs, f1, f2 = self.model(inputs, grid_sr, self.use_sr)
-                    loss2 = torch.tensor(0.0)
-                    
+
+                outputs, out_sigma = self.model(inputs, grid_c, 'train', epoch)   
+  
                   
                 ###bayesian loss
                 prob_list = self.post_prob(points, st_sizes, gridnum_sam_c)
-                #prob_list = self.post_prob(points, st_sizes)
-                #if epoch<100:
-                #    p = 0
-                #elif epoch<500 and epoch>100:
-                #    p = (epoch-100)/400
-                #else:
-                #    p = 1
-                loss1 = self.criterion(prob_list, prior_prob, outputs, epoch) #+ 0.05*grad
-                #print(grad.data.cpu().numpy())
+
+
+                loss1 = self.criterion(prob_list, prior_prob, outputs, epoch) 
                 
                 loss_KL = self.model.kl_div
-                #print(out_sigma.detach().cpu().numpy())
-                #print(self.model.kl_div.detach().cpu().numpy())
-                #print(torch.sum(0.01*torch.pow(out_sigma,2)).data.cpu().numpy())
-                #print(torch.sqrt(torch.sum(torch.pow(out_sigma,2))).data.cpu().numpy())
-                
-                #if epoch>500 and :
-                #    loss1 += 0.3*self.model.kl_div
-                
-                outputs = outputs/10#/4
                 
                 
-                ###test the output
-                
-                #print(f1.shape, f1.data.cpu().numpy().shape, f1.detach().cpu().numpy().shape)
-                #print(outputs.shape, sr_imgs.shape)torch.Size([16, 3, 64, 64]) torch.Size([16, 40000, 2])
-                
-                #np.save('post_prob.npy', prob_list[0].data.cpu().numpy())
-                
-                #print(mask_sr.shape, sr_imgs[0].shape, sr_gt.shape)
-                #loss2 = torch.nn.MSELoss(reduction = 'sum')(sr_imgs*mask_sr,sr_gt*mask_sr)
-                #print(sr_imgs.shape, torch.transpose(sr_gt,1,2).shape)[16, 40000, 3]) torch.Size([16, 40000, 3]
-                
-                #c = sr_imgs[0]*mask_sr
-                #if step == 100:
-                #    np.save('output_image.npy', c.data.cpu().numpy())
-                #    np.save('sr_image.npy', sr_imgs[0].data.cpu().numpy())
-                #    np.save('sr_mask.npy', mask_sr.data.cpu().numpy())
-                
-                
-                ####compute loss
-                
-                
-                #loss = 1.0*loss1 #+ 0.01*loss2#/self.args.batch_size   #####spatial vae what is p
-                
+                outputs = outputs/10
                 
                 
                 
@@ -390,7 +295,7 @@ class RegTrainer(Trainer):
                   self.optimizer2.step()
                   
                   
-                self.run_db.log({"iter_Loss": loss.item(), "sr_Loss": loss2.item(), "c_Loss": loss1.item()})
+                self.run_db.log({"iter_Loss": loss.item(), "c_Loss": loss1.item()})
                 
                 #for p in self.model.resnet_backbone.frontend2.parameters():### loss1: 10e-2, loss2: >10e2
                 #    if p is not None:
@@ -403,8 +308,7 @@ class RegTrainer(Trainer):
                 #print(pre_count.shape, gd_count.shape)
                 
                 res = pre_count - gd_count
-                f1 = f1.detach().cpu().numpy()
-                f2 = f2.detach().cpu().numpy()
+
                 #print(np.sum(f1),np.sum(f2))
                 
 
@@ -442,41 +346,25 @@ class RegTrainer(Trainer):
         c_results = []
         
         # Iterate over data.
-        for inputs, count, name, cor_C, cor_HR in self.dataloaders['val']:
+        for inputs, count, name, cor_C in self.dataloaders['val']:
             #print('val input',inputs.shape)
             inputs = inputs.to(self.device)
             cor_C = cor_C.to(self.device)
-            cor_HR = cor_HR.to(self.device)
             # inputs are images with different sizes
             assert inputs.size(0) == 1, 'the batch size should equal to 1 in validation mode'
             with torch.set_grad_enabled(False):
                 #print(cor_C)
-            
-                if self.use_sr:  
-                    outputs, sr_imgs, f1, f2 = self.model(inputs, cor_C, cor_HR, self.use_sr)
+
+                outputs, out_sigma = self.model(inputs, cor_C, 'test',self.epoch)
                     
-                    sr_results.append(sr_imgs.data.cpu().numpy())
-                else:
-                    outputs, f1, f2, out_sigma = self.model(inputs, cor_C, cor_HR, self.use_sr, 'test',self.epoch)
-                    
-                    #outputs, f1, f2 = self.model(inputs,cor_HR, self.use_sr)
-                
-                #outputs = outputs[:,:,::2,::2]
-                
-                outputs = outputs/10 #/4
-                #print(out_sigma.shape)
-                #print(torch.sum(0.01*torch.pow(out_sigma,2)).data.cpu().numpy())
-                #print(torch.sqrt(torch.sum(torch.pow(out_sigma,2))).data.cpu().numpy())
-                    
-                #outputs_sr, _ = self.model(sr_imgs)
-                #print(outputs.shape)
+
+                outputs = outputs/10
+
+
                 res = count[0].item() - torch.sum(outputs).item()
                 #print(torch.sum(outputs).item(),count[0].item())
 
                 epoch_res.append(res)
-                #print(count[0].item(), torch.sum(outputs).item())
-                #np.save('output_image.npy', outputs.data.cpu().numpy())
-                #np.save('input_image.npy', inputs.data.cpu().numpy())
 
                 c_results.append(outputs.data.cpu().numpy())
                 
@@ -538,7 +426,7 @@ class RegTrainer(Trainer):
         
         
         
-        return f1.detach().cpu().numpy(), f2.detach().cpu().numpy()
+        
 
 
 
