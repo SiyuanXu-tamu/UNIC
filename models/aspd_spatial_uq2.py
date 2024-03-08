@@ -53,9 +53,9 @@ class New_bay_Net(nn.Module):
         
         
         self.m = 64 ## pos = [b 1024 4*m]  
-        self.z_feature_size = 16   ##z = [b, 4*m, zf,zf]  
+        self.z_feature_size = int(self.input_size/self.downsample_ratio/2)   ##z = [b, 4*m, zf,zf]  
         
-        
+        self.z_target_size = 16
         
         
         self.pos_encode_layer = PositionalEncoding(0.5, self.m) ##0.5
@@ -63,13 +63,13 @@ class New_bay_Net(nn.Module):
         pos_out_dim = 2*2*self.m
         
         
-        weight_dim = pos_out_dim + 3*self.z_feature_size*self.z_feature_size + 4
+        weight_dim = pos_out_dim + 3*self.z_target_size*self.z_target_size + 4
         
-        self.Encoder2z = Encoder2z(self.input_size, weight_dim, self.z_feature_size)
+        self.Encoder2z = Encoder2z(self.input_size, weight_dim, self.z_target_size)
         
 
         
-        self.cc_decoder = build_cc_decoder(self.z_feature_size, self.m, pos_out_dim)   #### output_layer's size
+        self.cc_decoder = build_cc_decoder(self.z_feature_size,self.z_target_size, self.m, pos_out_dim)   #### output_layer's size
         
 
         self.kl_div = 0
@@ -156,12 +156,31 @@ class ASRNet(nn.Module):
         #print('1', time.time())
         #x = self.frontend1(x)
         x, f1, f2, f3 = self.resnet_backbone(x)
+        #x = self.drop1(x)
+
+        
+        if False:
+            residual = x
+            x = self.ca(x) * x
+            x = self.sa(x) * x
+            x += residual
+        ##%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%##
+            x1 = self.conv4_3_1(x)
+            x2 = self.conv4_3_2(x)
+            x3 = self.conv4_3_2(x)
+            x4 = self.conv4_3_2(x)
+            x = torch.cat((x1, x2, x3, x4), 1) 
+            x = self.conv5(x)
+            #x = self.drop2(x)
+        
+        seperate_point = x###seperate point
 
   
         
         x = self.output_layer(x)
             
   
+            #return x, f1, f2
             
             
         
@@ -275,13 +294,13 @@ class Res_Backbone(nn.Module):
 
     
 class Encoder2z(nn.Module):
-    def __init__(self, input_size, m_size, z_feature_size, load_weights=False):
+    def __init__(self, input_size, m_size, z_target_size, load_weights=False):
         super(Encoder2z, self).__init__()
         
         self.seen = 0
 
         self.m_size = m_size
-        self.z_feature_size = z_feature_size
+        self.z_target_size = z_target_size
         
         #self.ratio = int(np.log2(input_size/8 / self.z_feature_size)) #### input size should be changed
         self.ratio = 1
@@ -291,11 +310,17 @@ class Encoder2z(nn.Module):
 
         
         for i in range(self.ratio):
-            self.frontend_feat3 += [M, 512]
-
+            #self.frontend_feat += ['M',64]
+            #self.frontend_feat += ['M', 512,'M', self.m_size]
+            self.frontend_feat3 += ['M', 512]
+            #self.frontend_feat += [16]
+        #self.frontend_feat += [64,self.m_size]  ## [8 8 m]
+        #self.frontend_feat += [self.m_size,self.m_size]  ## [8 8 m]
+        #self.frontend_feat += [self.m_size,self.m_size]
+        
         
             
-        self.frontend_feat4 += [self.m_size, self.m_size]
+        self.frontend_feat4 += [512, self.m_size]
         self.frontend3 = make_layers_4(self.frontend_feat3, in_channels = 512, batch_norm = True)
         self.frontend4 = make_layers_4(self.frontend_feat4, in_channels = 512, batch_norm = True)
         #self.conv = nn.Conv2d(16, 1, 1, bias=False)
@@ -329,24 +354,25 @@ class Encoder2z(nn.Module):
                 nn.init.constant_(m.weight, 0.001)
         
 class CC_Decoder(nn.Module):
-    def __init__(self, feature_size, m_size, pos_out_dim):
+    def __init__(self, feature_size, z_target_size, m_size, pos_out_dim):
         super(CC_Decoder, self).__init__()
         self.m_size = m_size
         self.n_features = int(feature_size*feature_size)
+        self.n_target_features = int(z_target_size*z_target_size)
         self.pos_dim = pos_out_dim
         
-        self.weight_dim = self.pos_dim + 3*self.n_features + 4
+        self.weight_dim = self.pos_dim + 3*self.n_target_features + 4
         
         #n_features = feature_size*feature_size#+2*2*m_size
         #inplanes = inplanes
         #self.conv1 = nn.Conv2d(inplanes, 1, 1, bias=False)
         
-        self.last1 = nn.Linear(self.n_features, 1)
+        self.last1 = nn.Linear(self.n_target_features, 1)
         #self.last2 = nn.Linear(self.n_features, 1)
         self.last2 = torch.nn.Sequential(
-            nn.Linear(self.n_features, self.n_features),
+            nn.Linear(self.n_target_features, self.n_target_features),
             nn.PReLU(),
-            nn.Linear(self.n_features, 1),
+            nn.Linear(self.n_target_features, 1),
             )
         
         self.act = nn.PReLU()#nn.SiLU()  PReLU
@@ -364,10 +390,10 @@ class CC_Decoder(nn.Module):
         self.N.loc = self.N.loc.cuda()
         self.N.scale = self.N.scale.cuda()
         
-        self.learn_prior = Variable(torch.rand(1).type(torch.FloatTensor), requires_grad=True).cuda()
+        self.learn_prior = 0.1*Variable(torch.rand(1).type(torch.FloatTensor), requires_grad=True).cuda()
 
         
-        self.W_fine = nn.Linear(self.n_features, self.n_features)
+        self.W_fine = nn.Linear(self.n_features, self.n_target_features)
       
         self._initialize_weights() 
         self.omega_0 = 30.0
@@ -385,7 +411,7 @@ class CC_Decoder(nn.Module):
 
         
         W = torch.reshape(x1, (b, self.weight_dim, self.n_features))
-        W = self.W_fine(W)
+        W = self.W_fine(W)*0.1
 
         
 
@@ -393,15 +419,15 @@ class CC_Decoder(nn.Module):
         b1 = W[:,self.pos_dim:self.pos_dim+1,:].repeat(1, n_query_pts, 1)/10
         
         
-        W2 = W[:,(self.pos_dim+1):(self.pos_dim+self.n_features+1),:]
-        b2 = W[:,(self.pos_dim+self.n_features+1):(self.pos_dim+self.n_features+2),:].repeat(1, n_query_pts, 1)/10
+        W2 = W[:,(self.pos_dim+1):(self.pos_dim+self.n_target_features+1),:]
+        b2 = W[:,(self.pos_dim+self.n_target_features+1):(self.pos_dim+self.n_target_features+2),:].repeat(1, n_query_pts, 1)/10
         #print(W1.shape, W2.shape,b1.shape,b2.shape)
         
-        W3 = W[:,(self.pos_dim+self.n_features+2):(self.pos_dim+2*self.n_features+2),:]
-        b3 = W[:,(self.pos_dim+2*self.n_features+2):(self.pos_dim+2*self.n_features+3),:].repeat(1, n_query_pts, 1)/10
+        W3 = W[:,(self.pos_dim+self.n_target_features+2):(self.pos_dim+2*self.n_target_features+2),:]
+        b3 = W[:,(self.pos_dim+2*self.n_target_features+2):(self.pos_dim+2*self.n_target_features+3),:].repeat(1, n_query_pts, 1)/10
         
-        W4 = W[:,(self.pos_dim+2*self.n_features+3):(self.pos_dim+3*self.n_features+3),:]
-        b4 = W[:,(self.pos_dim+3*self.n_features+3):(self.pos_dim+3*self.n_features+4),:].repeat(1, n_query_pts, 1)/10
+        W4 = W[:,(self.pos_dim+2*self.n_target_features+3):(self.pos_dim+3*self.n_target_features+3),:]
+        b4 = W[:,(self.pos_dim+3*self.n_target_features+3):(self.pos_dim+3*self.n_target_features+4),:].repeat(1, n_query_pts, 1)/10
         
 
         
@@ -439,7 +465,7 @@ class CC_Decoder(nn.Module):
         #    out = out_mu + out_sigma*torch.mean(self.N.sample([out_mu.shape[0], out_mu.shape[1], 500]), axis = 2)
         #else:
         #    out = out_mu
-        out = out_mu
+        out = out_mu #* 0.5
         
         self.kl = torch.mean((0.5*out_sigma**2 + 0.5*(out_mu)**2 - torch.log(out_sigma) - 1/2))
         
@@ -466,8 +492,8 @@ class CC_Decoder(nn.Module):
                     nn.init.constant_(m.bias, 0) 
                     #nn.init.kaiming_uniform_(m.bias)
     
-def build_cc_decoder(feature_size, m_size, pos_out_dim):
-    return CC_Decoder(feature_size, m_size, pos_out_dim)
+def build_cc_decoder(feature_size, z_target_size, m_size, pos_out_dim):
+    return CC_Decoder(feature_size, z_target_size,  m_size, pos_out_dim)
     
 
 def make_layers_2(cfg, in_channels = 3,batch_norm=False,dilation = False):
