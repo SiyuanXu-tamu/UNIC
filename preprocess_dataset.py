@@ -45,7 +45,9 @@ def generate_data(im_path, ratio):
     
     im_w, im_h = im.size
     #mat_path = im_path.replace('.jpg', '_ann.mat')
+    #points = loadmat(im_path.replace('.jpg','.mat').replace('images','ground_truth').replace('IMG_','GT_IMG_'))['image_info'][0, 0][0, 0][0].astype(np.float32) ###['center'][0,0]
     points = loadmat(im_path.replace('.jpg','.mat').replace('images','ground_truth').replace('IMG_','GT_IMG_'))['center'][0,0].astype(np.float32)
+    #key = points.keys()
     points = points/ratio
     
     #points = loadmat(mat_path)['annPoints'].astype(np.float32)
@@ -76,7 +78,10 @@ if __name__ == '__main__':
     origin_dir = '../dataset/building_counting/RSOC_building/building'
     data_dir = '../dataset/building_counting/RSOC_building/building_bay_256'
     
+
+    
     ratio = int(512/256)
+
     
 
     for phase in ['train_data', 'test_data']:
