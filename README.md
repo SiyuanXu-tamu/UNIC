@@ -22,7 +22,7 @@ python preprocess_dataset.py
 3、 generate ground truth for our loss function
 
 ```
-python preprocess_gt.py, python make_dataset_RSOC.py
+python generate_density_maps.py, python generate_bayesian_gt.py
 ```
 3、 Train model (validate on single NVidia V100)
 
