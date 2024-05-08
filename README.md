@@ -17,7 +17,7 @@ This code was tested with python 3.6
 2、 Pre-Process Data (resize image and split train/validation)
 
 ```
-python preprocess_dataset.py
+python dataset_preprocess.py
 ```
 3、 generate ground truth for our loss function
 
