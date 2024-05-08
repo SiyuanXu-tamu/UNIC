@@ -80,14 +80,9 @@ class Crowd(data.Dataset):
         
         
         ######find the image path
-        if True:
-        #if method=='train':
-            self.im_list = sorted(glob(os.path.join(self.root_path, '*.jpg')))####img list
-        else:
-            origin_root_path = '/mnt/shared-scratch/siyuanxu/Counting/dataset/building_counting/RSOC_building/building_bay/test_data/images'
-            self.im_list = sorted(glob(os.path.join(origin_root_path, '*.png')))####img list
-            
-            
+
+        self.im_list = sorted(glob(os.path.join(self.root_path, '*.jpg')))####img list
+
             
             
         if method not in ['train', 'val']:
@@ -110,7 +105,7 @@ class Crowd(data.Dataset):
 
         
         
-        self.density_size = self.c_size // self.d_ratio #*2
+        self.density_size = self.c_size // self.d_ratio
         
         
         self.cor_C = get_coordinates(self.density_size, 1)
@@ -164,15 +159,14 @@ class Crowd(data.Dataset):
             keypoints = np.load(gd_path)
             
             ##density
-            den_path = img_path.replace('building_bay', 'building').replace('.jpg', '.h5').replace('images', 'ground_truth')
+            den_path = img_path.replace('.jpg', '.h5').replace('images', 'ground_truth')
             gt_file = h5py.File(den_path)
             den_target = np.asarray(gt_file['density'])
-            #den_target = cv2.resize(den_target, (self.density_size, self.density_size), interpolation=cv2.INTER_CUBIC) *(2*self.d_ratio)*(2*self.d_ratio)
             den_target = cv2.resize(den_target, (self.density_size, self.density_size), interpolation=cv2.INTER_CUBIC) *(self.d_ratio)*(self.d_ratio)
 
             
             ###read prior
-            prior_path = img_path.replace('.jpg', '.h5').replace('images', 'ground_truth')
+            prior_path = img_path.replace('.jpg', '.h5').replace('images', 'bayesian_prior')
             #print(prior_path)
             prior_prob = h5py.File(prior_path)['prior_prob']
             prior_prob = np.array(prior_prob)
