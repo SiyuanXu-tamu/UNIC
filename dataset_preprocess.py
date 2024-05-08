@@ -33,31 +33,44 @@ def cal_new_size(im_h, im_w, min_size, max_size):###limit the min and max size o
     return im_h, im_w, ratio
 
 
+def cal_new_size1(im_h, im_w, resize_h, resize_w):
+    ratio_h = 1.0 * resize_h/im_h
+    ratio_w = 1.0 * resize_w/im_w
+    
+    return ratio_h, ratio_w
+
 def find_dis(point):
     square = np.sum(point*points, axis=1)
     dis = np.sqrt(np.maximum(square[:, None] - 2*np.matmul(point, point.T) + square[None, :], 0.0))
     dis = np.mean(np.partition(dis, 3, axis=1)[:, 1:4], axis=1, keepdims=True)
     return dis
 
-def generate_data(im_path, ratio):
+def generate_data(im_path, resize_h, resize_w):
     im = Image.open(im_path)
-    im = im.resize([im.size[0] // ratio, im.size[1] // ratio])
+    #im = im.resize([im.size[0] // ratio, im.size[1] // ratio])
     
     im_w, im_h = im.size
     #mat_path = im_path.replace('.jpg', '_ann.mat')
     #points = loadmat(im_path.replace('.jpg','.mat').replace('images','ground_truth').replace('IMG_','GT_IMG_'))['image_info'][0, 0][0, 0][0].astype(np.float32) ###['center'][0,0]
     points = loadmat(im_path.replace('.jpg','.mat').replace('images','ground_truth').replace('IMG_','GT_IMG_'))['center'][0,0].astype(np.float32)
     #key = points.keys()
-    points = points/ratio
-    
+    #points = points/ratio
+    #print(points.shape,im_w,im_h)
     #points = loadmat(mat_path)['annPoints'].astype(np.float32)
     idx_mask = (points[:, 0] >= 0) * (points[:, 0] <= im_w) * (points[:, 1] >= 0) * (points[:, 1] <= im_h)
     points = points[idx_mask]
-    im_h, im_w, rr = cal_new_size(im_h, im_w, min_size, max_size)
+    
+    print(points.shape)
+    rr_h, rr_w = cal_new_size1(im_h, im_w, resize_h, resize_w)
+    
+    im = cv2.resize(np.array(im), (resize_w, resize_h), cv2.INTER_CUBIC)
+    
+    points[:,0] = points[:,0] * rr_w
+    points[:,1] = points[:,1] * rr_h
+    
     im = np.array(im)
-    if rr != 1.0:
-        im = cv2.resize(np.array(im), (im_w, im_h), cv2.INTER_CUBIC)
-        points = points * rr
+    print(im.shape)
+    
     return Image.fromarray(im), points
 
 
@@ -75,8 +88,11 @@ if __name__ == '__main__':
     min_size = 256
     max_size = 2048
     
-    origin_dir = '../dataset/building_counting/RSOC_building/building'
-    data_dir = '../dataset/building_counting/RSOC_building/building_bay_256'
+    resize_w = 256
+    resize_h = 256
+    
+    origin_dir = '../dataset/building_origin'
+    data_dir = '../dataset/new_building/building_256'
     
 
     
@@ -96,8 +112,7 @@ if __name__ == '__main__':
                         #im_path = os.path.join(sub_dir, i.strip())
                 name = os.path.basename(im_path)
                 print(name)
-                im, points = generate_data(im_path, ratio)
-                        
+                im, points = generate_data(im_path, resize_h, resize_w) 
                 dis = find_dis(points)
                 points = np.concatenate((points, dis), axis=1)
                 
