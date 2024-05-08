@@ -14,7 +14,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train ')
     parser.add_argument('--data-dir', default='../dataset/new_building/building_256/',
                         help='training data directory')
-    parser.add_argument('--save-dir', default='./toy_trained_models/',
+    parser.add_argument('--save-dir', default='./trained_models/',
                         help='directory to save models.')
 
     parser.add_argument('--lr', type=float, default=1e-4,
