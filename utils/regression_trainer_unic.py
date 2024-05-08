@@ -17,7 +17,7 @@ from datasets.crowd_unic import Crowd
 from losses.bay_loss_new import Bay_Loss
 from losses.post_prob_duo import Post_Prob
 
-import wandb
+
 import random
 
 from torch.optim import lr_scheduler
@@ -183,9 +183,6 @@ class RegTrainer(Trainer):
         self.best_mse = np.inf
         self.best_count = 0
         
-        #init wandb building
-        #self.run_db = wandb.init(project="Count2", name="b_bay_vae_256_123_no_sum",entity="yyuanx",reinit=True,config={"batch_size": args.batch_size,"lr": args.lr})
-        self.run_db = wandb.init(project="Count2", name=using_method + "_256_"+str(args.seed),entity="yyuanx",reinit=True,config={"batch_size": args.batch_size,"lr": args.lr})
 
     def train(self):
         """training process"""
@@ -205,8 +202,6 @@ class RegTrainer(Trainer):
             if epoch % args.val_epoch == 0 and epoch >= args.val_start:
                 self.val_epoch()
 
-        #wandb finish
-        self.run_db.finish()
 
     def train_eopch(self, epoch):
         epoch_loss = AverageMeter()
@@ -294,8 +289,7 @@ class RegTrainer(Trainer):
                   self.optimizer1.step()
                   self.optimizer2.step()
                   
-                  
-                self.run_db.log({"iter_Loss": loss.item(), "c_Loss": loss1.item()})
+
                 
                 #for p in self.model.resnet_backbone.frontend2.parameters():### loss1: 10e-2, loss2: >10e2
                 #    if p is not None:
@@ -377,8 +371,7 @@ class RegTrainer(Trainer):
         logging.info('Epoch {} Val, MSE: {:.2f} MAE: {:.2f}, Cost {:.1f} sec'
                      .format(self.epoch, mse, mae, time.time()-epoch_start))
                      
-        
-        self.run_db.log({"* MAE": mae, "* MSE": mse})
+
         
         model_state_dic = self.model.state_dict()
         #print(model_state_dic)
@@ -416,7 +409,6 @@ class RegTrainer(Trainer):
             rows = 1
             columns = 4
             for i in range(4):
-                #c_example = np.reshape(c_results[i], [32,32])
                 c_example = np.reshape(c_results[i], [32,32])
                 fig.add_subplot(rows, columns, i+1)    
                 plt.imshow(c_example)
