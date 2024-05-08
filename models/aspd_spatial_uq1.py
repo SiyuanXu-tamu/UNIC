@@ -291,13 +291,13 @@ class Encoder2z(nn.Module):
 
         
         for i in range(self.ratio):
-            self.frontend_feat3 += [M, 512]
+            self.frontend_feat3 += ['M',512]
 
         
             
-        self.frontend_feat4 += [self.m_size, self.m_size]
+        self.frontend_feat4 += [self.m_size]
         self.frontend3 = make_layers_4(self.frontend_feat3, in_channels = 512, batch_norm = True)
-        self.frontend4 = make_layers_4(self.frontend_feat4, in_channels = 512, batch_norm = True)
+        self.frontend4 = make_layers_4(self.frontend_feat4, in_channels = 512, batch_norm = False)
         #self.conv = nn.Conv2d(16, 1, 1, bias=False)
         
         self.output_layer = nn.Conv2d(self.m_size, self.m_size, kernel_size=1)
@@ -337,12 +337,9 @@ class CC_Decoder(nn.Module):
         
         self.weight_dim = self.pos_dim + 3*self.n_features + 4
         
-        #n_features = feature_size*feature_size#+2*2*m_size
-        #inplanes = inplanes
-        #self.conv1 = nn.Conv2d(inplanes, 1, 1, bias=False)
-        
+
         self.last1 = nn.Linear(self.n_features, 1)
-        #self.last2 = nn.Linear(self.n_features, 1)
+
         self.last2 = torch.nn.Sequential(
             nn.Linear(self.n_features, self.n_features),
             nn.PReLU(),
@@ -364,13 +361,13 @@ class CC_Decoder(nn.Module):
         self.N.loc = self.N.loc.cuda()
         self.N.scale = self.N.scale.cuda()
         
-        self.learn_prior = Variable(torch.rand(1).type(torch.FloatTensor), requires_grad=True).cuda()
+        #self.learn_prior = Variable(torch.rand(1).type(torch.FloatTensor), requires_grad=True).cuda()
 
         
         self.W_fine = nn.Linear(self.n_features, self.n_features)
       
         self._initialize_weights() 
-        self.omega_0 = 30.0
+        #self.omega_0 = 30.0
         self.kl = 0
         
 
