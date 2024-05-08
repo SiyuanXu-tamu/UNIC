@@ -12,7 +12,7 @@ args = None
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train ')
-    parser.add_argument('--data-dir', default='../dataset/building_counting/RSOC_building/building_bay_256/',
+    parser.add_argument('--data-dir', default='../dataset/new_building/building_256/',
                         help='training data directory')
     parser.add_argument('--save-dir', default='./toy_trained_models/',
                         help='directory to save models.')
