@@ -295,7 +295,7 @@ class Encoder2z(nn.Module):
 
         
             
-        self.frontend_feat4 += [self.m_size]
+        self.frontend_feat4 += [512, self.m_size]
         self.frontend3 = make_layers_4(self.frontend_feat3, in_channels = 512, batch_norm = True)
         self.frontend4 = make_layers_4(self.frontend_feat4, in_channels = 512, batch_norm = False)
         #self.conv = nn.Conv2d(16, 1, 1, bias=False)
