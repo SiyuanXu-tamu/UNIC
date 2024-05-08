@@ -10,16 +10,15 @@ import scipy
 import cv2
 import json
 from matplotlib import cm as CM
-import torch
 
 from scipy.special import softmax
 
-building_train = os.path.join('../dataset/building_counting/RSOC_building/building_bay_256/train_data/','images')
-building_test = os.path.join('../dataset/building_counting/RSOC_building/building_bay_256/test_data/','images')
+building_train = os.path.join('../dataset/new_building/building_256/train_data/','images')
+building_test = os.path.join('../dataset/new_building/building_256/test_data/','images')
 
 
 
-gt_path = '../dataset/building_counting/RSOC_building/building_bay_256/train_data/ground_truth/'
+gt_path = '../dataset/new_building/building_256/train_data/bayesian_prior/'
 
 
 
@@ -32,8 +31,7 @@ sigma = 4
 
 use_bg = True  ###whether use background
 bg_ratio = 1.0
-input_size = 256
-
+input_size = 256  ###image_size of building_train_path
 
 img_paths = []
 for path in path_sets:
@@ -41,28 +39,26 @@ for path in path_sets:
         img_paths.append(img_path)
 print(len(img_paths))
 
+
 for img_path in img_paths:
-    #mat = io.loadmat(img_path.replace('.jpg','.mat').replace('images','ground_truth').replace('IMG_','GT_IMG_'))
     img= plt.imread(img_path)
-    
-    #gt = mat['center'][0,0].astype(np.float32) 
-    
-    
-    gd_path = img_path.replace('png', 'npy')
+   
+    gd_path = img_path.replace('jpg', 'npy')
     
     gt = np.load(gd_path, allow_pickle=True).astype(np.float32)
     gt = gt[:, :2]
 
     
-    origin_size = img.shape[0]
+    #origin_size = img.shape[0]
     
     origin_size = img.shape[0]
     target_size = 256   #### size after manual operation  512-64-8
     ratio = int(origin_size/target_size)
     
     gt = gt/ratio
+    print('ratio', ratio)
     
-    down_sample_step = down_sample_rate * int(target_size/input_size)
+    down_sample_step = down_sample_rate
     
     #print(img_path)
     
@@ -150,5 +146,4 @@ for img_path in img_paths:
     
     with h5py.File(gt_path+name[-1][:-4]+'.h5', 'w') as hf:
             hf['prior_prob'] = prior_prob
-            
-    
+
