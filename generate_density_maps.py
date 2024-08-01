@@ -44,8 +44,8 @@ RSOC_train = os.path.join('../dataset/new_building/building_256/train_data/','im
 RSOC_test = os.path.join('../dataset/new_building/building_256/test_data/','images')
 
 
-print(RSOC_train, RSOC_train)
-path_sets = [RSOC_train,RSOC_train]
+print(RSOC_train, RSOC_test)
+path_sets = [RSOC_train,RSOC_test]
 
 img_paths = []
 for path in path_sets:
